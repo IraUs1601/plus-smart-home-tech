@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: collector
+
+kafka:
+  bootstrap-servers: localhost:9092
+  sensor-events-topic: telemetry.sensors.v1
+  hub-events-topic: telemetry.hubs.v1
