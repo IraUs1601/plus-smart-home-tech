@@ -1,6 +1,37 @@
 syntax = "proto3";
 
+import "google/protobuf/timestamp.proto";
+
 package telemetry.message.event;
 
 option java_multiple_files = true;
 option java_package = "ru.yandex.practicum.grpc.telemetry.event";
+
+// основное событие, которое возникает в хабе
+message HubEventProto {
+  string hub_id = 1; // идентификатор хаба
+  google.protobuf.Timestamp timestamp = 2; // таймстемп события
+
+  oneof payload { // содержимое конкретного события
+    DeviceAddedEventProto device_added = 3;        // событие добавления устройства
+    DeviceRemovedEventProto device_removed = 4;    // событие удаления устройства
+  }
+}
+
+// события (де)регистрации устройств
+enum DeviceTypeProto {
+  MOTION_SENSOR = 0;      // датчик движения
+  TEMPERATURE_SENSOR = 1; // датчик температуры
+  LIGHT_SENSOR = 2;       // датчик освещённости
+  CLIMATE_SENSOR = 3;     // датчик контроля климата
+  SWITCH_SENSOR = 4;      // переключатель
+}
+
+message DeviceAddedEventProto {
+  string id = 1;            // идентификатор устройства
+  DeviceTypeProto type = 2; // тип устройства
+}
+
+message DeviceRemovedEventProto {
+  string id = 1; // идентификатор устройства
+}
