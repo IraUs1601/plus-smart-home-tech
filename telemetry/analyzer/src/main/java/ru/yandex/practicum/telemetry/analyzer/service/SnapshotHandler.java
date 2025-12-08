@@ -10,7 +10,6 @@ import ru.yandex.practicum.kafka.telemetry.event.MotionSensorAvro;
 import ru.yandex.practicum.kafka.telemetry.event.SensorStateAvro;
 import ru.yandex.practicum.kafka.telemetry.event.SensorsSnapshotAvro;
 import ru.yandex.practicum.kafka.telemetry.event.SwitchSensorAvro;
-import ru.yandex.practicum.kafka.telemetry.event.TemperatureSensorAvro;
 import ru.yandex.practicum.telemetry.analyzer.client.HubRouterClient;
 import ru.yandex.practicum.telemetry.analyzer.model.Action;
 import ru.yandex.practicum.telemetry.analyzer.model.Condition;
@@ -26,7 +25,6 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class SnapshotHandler {
-
     private final ScenarioRepository scenarioRepository;
     private final ConditionRepository conditionRepository;
     private final ActionRepository actionRepository;
@@ -34,11 +32,6 @@ public class SnapshotHandler {
 
     public void handle(SensorsSnapshotAvro snapshot) {
         Map<String, SensorStateAvro> states = snapshot.getSensorsState();
-        if (states == null || states.isEmpty()) {
-            log.debug("No sensor states in snapshot for hub {}", snapshot.getHubId());
-            return;
-        }
-
         List<Scenario> scenarios = scenarioRepository.findByHubId(snapshot.getHubId());
         scenarios.stream()
                 .filter(scenario -> checkConditions(scenario, states))
@@ -57,7 +50,7 @@ public class SnapshotHandler {
         }
 
         Integer sensorValue = extractSensorValue(state.getData(), condition.getType());
-        if (sensorValue == null || condition.getValue() == null) {
+        if (sensorValue == null) {
             return false;
         }
 
@@ -71,25 +64,12 @@ public class SnapshotHandler {
 
     private Integer extractSensorValue(Object data, ConditionTypeAvro type) {
         return switch (type) {
-            case TEMPERATURE -> {
-                if (data instanceof ClimateSensorAvro climate) {
-                    yield climate.getTemperatureC();
-                } else if (data instanceof TemperatureSensorAvro temp) {
-                    yield temp.getTemperatureC();
-                } else {
-                    yield null;
-                }
-            }
-            case HUMIDITY ->
-                    (data instanceof ClimateSensorAvro climate) ? climate.getHumidity() : null;
-            case CO2LEVEL ->
-                    (data instanceof ClimateSensorAvro climate) ? climate.getCo2Level() : null;
-            case LUMINOSITY ->
-                    (data instanceof LightSensorAvro light) ? light.getLuminosity() : null;
-            case MOTION ->
-                    (data instanceof MotionSensorAvro motion) ? (motion.getMotion() ? 1 : 0) : null;
-            case SWITCH ->
-                    (data instanceof SwitchSensorAvro sw) ? (sw.getState() ? 1 : 0) : null;
+            case TEMPERATURE -> data instanceof ClimateSensorAvro climate ? climate.getTemperatureC() : null;
+            case HUMIDITY -> data instanceof ClimateSensorAvro climate ? climate.getHumidity() : null;
+            case CO2LEVEL -> data instanceof ClimateSensorAvro climate ? climate.getCo2Level() : null;
+            case LUMINOSITY -> data instanceof LightSensorAvro light ? light.getLuminosity() : null;
+            case MOTION -> data instanceof MotionSensorAvro motion ? (motion.getMotion() ? 1 : 0) : null;
+            case SWITCH -> data instanceof SwitchSensorAvro switchSensor ? (switchSensor.getState() ? 1 : 0) : null;
         };
     }
 
