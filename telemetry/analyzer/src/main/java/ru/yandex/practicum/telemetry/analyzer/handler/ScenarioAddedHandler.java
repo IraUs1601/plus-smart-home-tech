@@ -1,7 +1,6 @@
 package ru.yandex.practicum.telemetry.analyzer.handler;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.kafka.telemetry.event.DeviceActionAvro;
 import ru.yandex.practicum.kafka.telemetry.event.HubEventAvro;
@@ -18,7 +17,6 @@ import ru.yandex.practicum.telemetry.analyzer.repository.SensorRepository;
 import java.util.List;
 import java.util.stream.Collectors;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class ScenarioAddedHandler implements HubEventHandler {
@@ -30,29 +28,33 @@ public class ScenarioAddedHandler implements HubEventHandler {
     @Override
     public void handle(HubEventAvro event) {
         ScenarioAddedEventAvro payload = (ScenarioAddedEventAvro) event.getPayload();
-        Scenario scenario = scenarioRepository.findByHubIdAndName(event.getHubId(), payload.getName())
-                .orElseGet(() -> {
-                    Scenario newScenario = Scenario.builder()
-                            .hubId(event.getHubId())
-                            .name(payload.getName())
-                            .build();
-                    return scenarioRepository.save(newScenario);
-                });
+        if (payload == null) {
+            return;
+        }
 
+        Scenario scenario = scenarioRepository.findByHubIdAndName(event.getHubId(), payload.getName())
+                .orElseGet(() -> scenarioRepository.save(
+                        Scenario.builder()
+                                .hubId(event.getHubId())
+                                .name(payload.getName())
+                                .build()
+                ));
         List<String> actionSensorIds = payload.getActions().stream()
                 .map(DeviceActionAvro::getSensorId)
                 .toList();
+
         if (sensorRepository.existsByIdInAndHubId(actionSensorIds, event.getHubId())) {
+
             List<Action> actions = payload.getActions().stream()
-                    .map(action -> Action.builder()
-                            .sensor(sensorRepository.findById(action.getSensorId()).orElseThrow())
+                    .map(a -> Action.builder()
+                            .sensor(sensorRepository.findById(a.getSensorId()).orElseThrow())
                             .scenario(scenario)
-                            .type(action.getType())
-                            .value(action.getValue() != null ? action.getValue() : 0)
-                            .build())
-                    .collect(Collectors.toList());
+                            .type(a.getType())
+                            .value(a.getValue() != null ? a.getValue() : 0)
+                            .build()
+                    ).collect(Collectors.toList());
+
             actionRepository.saveAll(actions);
-            log.info("Saved {} actions for scenario {}", actions.size(), scenario.getName());
         }
 
         List<String> conditionSensorIds = payload.getConditions().stream()
@@ -60,22 +62,22 @@ public class ScenarioAddedHandler implements HubEventHandler {
                 .toList();
         if (sensorRepository.existsByIdInAndHubId(conditionSensorIds, event.getHubId())) {
             List<Condition> conditions = payload.getConditions().stream()
-                    .map(condition -> Condition.builder()
-                            .sensor(sensorRepository.findById(condition.getSensorId()).orElseThrow())
+                    .map(c -> Condition.builder()
+                            .sensor(sensorRepository.findById(c.getSensorId()).orElseThrow())
                             .scenario(scenario)
-                            .type(condition.getType())
-                            .operation(condition.getOperation())
-                            .value(mapValue(condition.getValue()))
-                            .build())
-                    .collect(Collectors.toList());
+                            .type(c.getType())
+                            .operation(c.getOperation())
+                            .value(mapValue(c.getValue()))
+                            .build()
+                    ).collect(Collectors.toList());
+
             conditionRepository.saveAll(conditions);
-            log.info("Saved {} conditions for scenario {}", conditions.size(), scenario.getName());
         }
     }
 
     private Integer mapValue(Object value) {
-        if (value instanceof Integer) {
-            return (Integer) value;
+        if (value instanceof Integer i) {
+            return i;
         }
         return (Boolean) value ? 1 : 0;
     }

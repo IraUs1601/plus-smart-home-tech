@@ -16,6 +16,11 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
     show-sql: false
 
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+
 kafka:
   bootstrap-servers: localhost:9092
   consumer:

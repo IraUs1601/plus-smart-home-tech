@@ -1,7 +1,6 @@
 package ru.yandex.practicum.telemetry.analyzer.processor;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -23,7 +22,6 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class HubEventProcessor implements Runnable {
@@ -45,7 +43,6 @@ public class HubEventProcessor implements Runnable {
     @PostConstruct
     public void start() {
         new Thread(this, "HubEventHandlerThread").start();
-        log.info("Started HubEventProcessor thread");
     }
 
     @Override
@@ -58,40 +55,44 @@ public class HubEventProcessor implements Runnable {
             props.put("value.deserializer", HubEventDeserializer.class.getName());
             props.put("auto.offset.reset", "earliest");
             props.put("enable.auto.commit", "false");
+
             hubEventConsumer = new KafkaConsumer<>(props);
 
             handlerMap = handlers.stream()
                     .collect(Collectors.toMap(HubEventHandler::getEventType, Function.identity()));
-            log.info("Initialized handlerMap with {} handlers", handlerMap.size());
 
             hubEventConsumer.subscribe(List.of(hubEventsTopic));
-            log.info("Subscribed to hub events topic: {}", hubEventsTopic);
 
             while (running) {
                 try {
-                    ConsumerRecords<String, HubEventAvro> records = hubEventConsumer.poll(Duration.ofMillis(1000));
+                    ConsumerRecords<String, HubEventAvro> records =
+                            hubEventConsumer.poll(Duration.ofMillis(1000));
+
                     for (ConsumerRecord<String, HubEventAvro> record : records) {
                         try {
                             HubEventAvro event = record.value();
-                            if (event == null) {
-                                log.warn("Null event received at offset {} in topic {}", record.offset(), hubEventsTopic);
+                            if (event == null || event.getPayload() == null) {
                                 continue;
                             }
+
                             String eventType = event.getPayload().getClass().getSimpleName();
-                            log.info("Processing event: hubId={}, type={}, offset={}", event.getHubId(), eventType, record.offset());
-                            if (handlerMap.containsKey(eventType)) {
-                                handlerMap.get(eventType).handle(event);
+                            HubEventHandler handler = handlerMap.get(eventType);
+                            if (handler != null) {
+                                handler.handle(event);
                             } else {
-                                log.warn("No handler for event type: {}", eventType);
                             }
+
                         } catch (Exception e) {
-                            log.error("Failed to process event at offset {} in topic {}: {}", record.offset(), hubEventsTopic, e.getMessage(), e);
-                            hubEventConsumer.seek(new TopicPartition(record.topic(), record.partition()), record.offset() + 1);
+                            hubEventConsumer.seek(
+                                    new TopicPartition(record.topic(), record.partition()),
+                                    record.offset() + 1
+                            );
                         }
                     }
+
                     hubEventConsumer.commitSync();
+
                 } catch (Exception e) {
-                    log.error("Error polling hub events: {}", e.getMessage(), e);
                     try {
                         Thread.sleep(1000);
                     } catch (InterruptedException ie) {
@@ -100,10 +101,9 @@ public class HubEventProcessor implements Runnable {
                     }
                 }
             }
+
         } catch (WakeupException ignored) {
-            log.info("HubEventProcessor received wakeup signal");
         } catch (Exception e) {
-            log.error("Fatal error in HubEventProcessor: {}", e.getMessage(), e);
         } finally {
             closeConsumer();
         }
@@ -111,7 +111,6 @@ public class HubEventProcessor implements Runnable {
 
     @PreDestroy
     public void shutdown() {
-        log.info("Shutting down HubEventProcessor");
         running = false;
         if (hubEventConsumer != null) {
             hubEventConsumer.wakeup();
@@ -123,10 +122,8 @@ public class HubEventProcessor implements Runnable {
             if (hubEventConsumer != null) {
                 hubEventConsumer.commitSync();
                 hubEventConsumer.close(Duration.ofSeconds(5));
-                log.info("Hub event consumer closed");
             }
-        } catch (Exception e) {
-            log.error("Error closing hub event consumer: {}", e.getMessage(), e);
+        } catch (Exception ignored) {
         }
     }
 }

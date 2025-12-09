@@ -19,15 +19,22 @@ public class DeviceAddedHandler implements HubEventHandler {
     @Override
     public void handle(HubEventAvro event) {
         DeviceAddedEventAvro payload = (DeviceAddedEventAvro) event.getPayload();
-        if (!sensorRepository.existsByIdInAndHubId(List.of(payload.getId()), event.getHubId())) {
+
+        if (payload == null) {
+            return;
+        }
+
+        boolean exists = sensorRepository.existsByIdInAndHubId(
+                List.of(payload.getId()),
+                event.getHubId()
+        );
+
+        if (!exists) {
             Sensor sensor = Sensor.builder()
                     .id(payload.getId())
                     .hubId(event.getHubId())
                     .build();
             sensorRepository.save(sensor);
-            log.info("Added device {} for hub {}", payload.getId(), event.getHubId());
-        } else {
-            log.info("Device {} already exists for hub {}", payload.getId(), event.getHubId());
         }
     }
 

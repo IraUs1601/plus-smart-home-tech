@@ -1,7 +1,6 @@
 package ru.yandex.practicum.telemetry.analyzer.service;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.kafka.telemetry.event.ClimateSensorAvro;
 import ru.yandex.practicum.kafka.telemetry.event.ConditionTypeAvro;
@@ -21,10 +20,10 @@ import ru.yandex.practicum.telemetry.analyzer.repository.ScenarioRepository;
 import java.util.List;
 import java.util.Map;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SnapshotHandler {
+
     private final ScenarioRepository scenarioRepository;
     private final ConditionRepository conditionRepository;
     private final ActionRepository actionRepository;
@@ -32,7 +31,16 @@ public class SnapshotHandler {
 
     public void handle(SensorsSnapshotAvro snapshot) {
         Map<String, SensorStateAvro> states = snapshot.getSensorsState();
+
+        if (states == null || states.isEmpty()) {
+            return;
+        }
+
         List<Scenario> scenarios = scenarioRepository.findByHubId(snapshot.getHubId());
+        if (scenarios.isEmpty()) {
+            return;
+        }
+
         scenarios.stream()
                 .filter(scenario -> checkConditions(scenario, states))
                 .forEach(this::executeActions);
@@ -40,42 +48,87 @@ public class SnapshotHandler {
 
     private boolean checkConditions(Scenario scenario, Map<String, SensorStateAvro> states) {
         List<Condition> conditions = conditionRepository.findAllByScenario(scenario);
-        return conditions.stream().allMatch(condition -> evaluateCondition(condition, states));
+        if (conditions.isEmpty()) {
+            return false;
+        }
+        return conditions.stream().allMatch(condition -> evaluateCondition(scenario, condition, states));
     }
 
-    private boolean evaluateCondition(Condition condition, Map<String, SensorStateAvro> states) {
-        SensorStateAvro state = states.get(condition.getSensor().getId());
+    private boolean evaluateCondition(Scenario scenario,
+                                      Condition condition,
+                                      Map<String, SensorStateAvro> states) {
+
+        String sensorId = condition.getSensor().getId();
+        SensorStateAvro state = states.get(sensorId);
         if (state == null) {
             return false;
         }
 
-        Integer sensorValue = extractSensorValue(state.getData(), condition.getType());
+        Object data = state.getData();
+        Integer sensorValue = extractSensorValue(data, condition.getType());
         if (sensorValue == null) {
             return false;
         }
 
+        Integer expected = condition.getValue();
         return switch (condition.getOperation()) {
-            case EQUALS -> sensorValue.equals(condition.getValue());
-            case LOWER_THAN -> sensorValue < condition.getValue();
-            case GREATER_THAN -> sensorValue > condition.getValue();
+            case EQUALS -> sensorValue.equals(expected);
+            case LOWER_THAN -> sensorValue < expected;
+            case GREATER_THAN -> sensorValue > expected;
             default -> false;
         };
     }
 
     private Integer extractSensorValue(Object data, ConditionTypeAvro type) {
+        if (data == null) {
+            return null;
+        }
+
         return switch (type) {
-            case TEMPERATURE -> data instanceof ClimateSensorAvro climate ? climate.getTemperatureC() : null;
-            case HUMIDITY -> data instanceof ClimateSensorAvro climate ? climate.getHumidity() : null;
-            case CO2LEVEL -> data instanceof ClimateSensorAvro climate ? climate.getCo2Level() : null;
-            case LUMINOSITY -> data instanceof LightSensorAvro light ? light.getLuminosity() : null;
-            case MOTION -> data instanceof MotionSensorAvro motion ? (motion.getMotion() ? 1 : 0) : null;
-            case SWITCH -> data instanceof SwitchSensorAvro switchSensor ? (switchSensor.getState() ? 1 : 0) : null;
+            case TEMPERATURE -> {
+                if (data instanceof ClimateSensorAvro climate) {
+                    yield climate.getTemperatureC();
+                }
+                yield null;
+            }
+            case HUMIDITY -> {
+                if (data instanceof ClimateSensorAvro climate) {
+                    yield climate.getHumidity();
+                }
+                yield null;
+            }
+            case CO2LEVEL -> {
+                if (data instanceof ClimateSensorAvro climate) {
+                    yield climate.getCo2Level();
+                }
+                yield null;
+            }
+            case LUMINOSITY -> {
+                if (data instanceof LightSensorAvro light) {
+                    yield light.getLuminosity();
+                }
+                yield null;
+            }
+            case MOTION -> {
+                if (data instanceof MotionSensorAvro motion) {
+                    yield motion.getMotion() ? 1 : 0;
+                }
+                yield null;
+            }
+            case SWITCH -> {
+                if (data instanceof SwitchSensorAvro switchSensor) {
+                    yield switchSensor.getState() ? 1 : 0;
+                }
+                yield null;
+            }
         };
     }
 
     private void executeActions(Scenario scenario) {
         List<Action> actions = actionRepository.findAllByScenario(scenario);
+        if (actions.isEmpty()) {
+            return;
+        }
         actions.forEach(hubRouterClient::sendAction);
-        log.info("Executed {} actions for scenario {}", actions.size(), scenario.getName());
     }
 }
