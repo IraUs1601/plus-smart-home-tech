@@ -52,7 +52,15 @@
                 <scope>import</scope>
             </dependency>
 
-            <!-- Avro -->
+            <!-- gRPC BOM -->
+            <dependency>
+                <groupId>io.grpc</groupId>
+                <artifactId>grpc-bom</artifactId>
+                <version>${grpc.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
             <dependency>
                 <groupId>org.apache.avro</groupId>
                 <artifactId>avro</artifactId>
@@ -77,26 +85,6 @@
                 <artifactId>grpc-spring-boot-starter</artifactId>
                 <version>${grpc-spring-boot-starter.version}</version>
             </dependency>
-
-            <dependency>
-                <groupId>net.devh</groupId>
-                <artifactId>grpc-server-spring-boot-starter</artifactId>
-                <version>${grpc-spring-boot-starter.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>io.grpc</groupId>
-                <artifactId>grpc-stub</artifactId>
-                <version>${grpc.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>io.grpc</groupId>
-                <artifactId>grpc-protobuf</artifactId>
-                <version>${grpc.version}</version>
-            </dependency>
-
-            <!--    / GRPC dependencies management        -->
         </dependencies>
     </dependencyManagement>
 
