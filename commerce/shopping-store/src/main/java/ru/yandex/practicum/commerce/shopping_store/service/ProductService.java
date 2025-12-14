@@ -27,7 +27,7 @@ public class ProductService {
     public Page<ProductDto> getProducts(String category, Pageable pageable) {
         try {
             Category cat = Category.valueOf(category.toUpperCase());
-            return productRepository.findByCategoryAndStatus(cat, Status.ACTIVE, pageable)
+            return productRepository.findByCategory(cat, pageable)
                     .map(productMapper::toDto);
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Invalid category: " + category);
