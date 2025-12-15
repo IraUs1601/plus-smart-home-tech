@@ -1,12 +1,15 @@
 spring:
   application:
     name: collector
+  config:
+    import: "configserver:"
+  cloud:
+    config:
+      discovery:
+        enabled: true
+        service-id: config-server
 
-kafka:
-  bootstrap-servers: localhost:9092
-  sensor-events-topic: telemetry.sensors.v1
-  hub-events-topic: telemetry.hubs.v1
-
-grpc:
-  server:
-    port: 59091
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka/
