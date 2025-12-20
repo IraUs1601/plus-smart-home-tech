@@ -5,9 +5,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import ru.yandex.practicum.commerce.interaction_api.dto.ProductDto;
-import ru.yandex.practicum.commerce.interaction_api.enums.Availability;
+import ru.yandex.practicum.commerce.interaction_api.requests.SetProductQuantityStateRequest;
 import ru.yandex.practicum.commerce.interaction_api.enums.Category;
 import ru.yandex.practicum.commerce.interaction_api.enums.Status;
 import ru.yandex.practicum.commerce.interaction_api.exceptions.ProductNotFoundException;
@@ -27,7 +26,7 @@ public class ProductService {
     public Page<ProductDto> getProducts(String category, Pageable pageable) {
         try {
             Category cat = Category.valueOf(category.toUpperCase());
-            return productRepository.findByCategory(cat, pageable)
+            return productRepository.findByCategoryAndStatus(cat, Status.ACTIVE, pageable)
                     .map(productMapper::toDto);
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Invalid category: " + category);
@@ -72,15 +71,11 @@ public class ProductService {
         return true;
     }
 
-    @Transactional
-    public ProductDto setProductQuantityState(UUID productId, Availability quantityState) {
-        if (productId == null) throw new IllegalArgumentException("productId must not be null");
-        if (quantityState == null) throw new IllegalArgumentException("quantityState must not be null");
-
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new EntityNotFoundException(NOT_FOUND + productId));
-
-        product.setAvailability(quantityState);
-        return productMapper.toDto(productRepository.save(product));
+    public boolean setProductQuantityState(SetProductQuantityStateRequest request) {
+        Product product = productRepository.findById(request.getProductId())
+                .orElseThrow(() -> new EntityNotFoundException(NOT_FOUND + request.getProductId()));
+        product.setAvailability(request.getQuantityState());
+        productRepository.save(product);
+        return true;
     }
 }

@@ -4,7 +4,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
 import ru.yandex.practicum.commerce.interaction_api.dto.ProductDto;
-import ru.yandex.practicum.commerce.interaction_api.requests.SetProductQuantityStateRequest;
+import ru.yandex.practicum.commerce.interaction_api.enums.Availability;
 
 import java.util.UUID;
 
@@ -26,5 +26,7 @@ public interface ProductApi {
     boolean removeProductFromStore(@RequestBody UUID productId);
 
     @PostMapping("/api/v1/shopping-store/quantityState")
-    ProductDto setProductQuantityState(@ModelAttribute SetProductQuantityStateRequest request);
+    boolean setProductQuantityState(@RequestParam UUID productId,
+                                    @RequestParam Availability quantityState
+    );
 }
