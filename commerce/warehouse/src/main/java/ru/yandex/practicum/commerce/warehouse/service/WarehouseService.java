@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.yandex.practicum.commerce.interaction_api.client.ProductClient;
+import ru.yandex.practicum.commerce.interaction_api.dto.BookedProductsDto;
 import ru.yandex.practicum.commerce.interaction_api.requests.AddProductToWarehouseRequest;
 import ru.yandex.practicum.commerce.interaction_api.dto.AddressDto;
 import ru.yandex.practicum.commerce.interaction_api.requests.NewProductInWarehouseRequest;
@@ -60,23 +61,14 @@ public class WarehouseService {
     }
 
     @Transactional(readOnly = true)
-    public void checkProductQuantityEnoughForShoppingCart(ShoppingCartDto cart) {
-        if (cart == null || cart.getProducts() == null || cart.getProducts().isEmpty()) {
-            throw new IllegalArgumentException("Shopping cart products must not be empty");
-        }
+    public BookedProductsDto checkProductQuantityEnoughForShoppingCart(ShoppingCartDto cart) {
+        double totalWeight = 0.0;
+        double totalVolume = 0.0;
+        boolean hasFragile = false;
 
         for (Map.Entry<String, Long> entry : cart.getProducts().entrySet()) {
-            UUID productId;
-            try {
-                productId = UUID.fromString(entry.getKey());
-            } catch (Exception e) {
-                throw new IllegalArgumentException("Invalid productId UUID: " + entry.getKey());
-            }
-
+            UUID productId = UUID.fromString(entry.getKey());
             Long requestedQuantity = entry.getValue();
-            if (requestedQuantity == null || requestedQuantity <= 0) {
-                throw new IllegalArgumentException("Quantity must be positive for productId: " + productId);
-            }
 
             Product product = productRepository.findById(productId)
                     .orElseThrow(() -> new NoSpecifiedProductInWarehouseException(
@@ -87,7 +79,13 @@ public class WarehouseService {
                         "Insufficient quantity for product ID " + productId + ": requested " +
                                 requestedQuantity + ", available " + product.getQuantity());
             }
+
+            totalWeight += product.getWeight() * requestedQuantity;
+            totalVolume += product.getWidth() * product.getHeight() * product.getDepth() * requestedQuantity;
+            hasFragile = hasFragile || product.getFragile();
         }
+
+        return new BookedProductsDto(totalWeight, totalVolume, hasFragile);
     }
 
     @Transactional(readOnly = true)
@@ -133,6 +131,9 @@ public class WarehouseService {
             product.setQuantity(product.getQuantity() - entry.getValue());
             productRepository.save(product);
         }
+    }
+
+    public void shippedToDelivery(UUID orderId, UUID deliveryId) {
     }
 
     @Transactional

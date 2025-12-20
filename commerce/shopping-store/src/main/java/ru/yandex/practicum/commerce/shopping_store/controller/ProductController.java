@@ -6,6 +6,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
 import ru.yandex.practicum.commerce.interaction_api.api.ProductApi;
 import ru.yandex.practicum.commerce.interaction_api.dto.ProductDto;
+import ru.yandex.practicum.commerce.interaction_api.enums.Availability;
 import ru.yandex.practicum.commerce.interaction_api.requests.SetProductQuantityStateRequest;
 import ru.yandex.practicum.commerce.shopping_store.service.ProductService;
 
@@ -43,7 +44,10 @@ public class ProductController implements ProductApi {
     }
 
     @Override
-    public ProductDto setProductQuantityState(@ModelAttribute SetProductQuantityStateRequest request) {
-        return productService.setProductQuantityState(request.getProductId(), request.getQuantityState());
+    public boolean setProductQuantityState(@RequestParam UUID productId, @RequestParam Availability quantityState) {
+        SetProductQuantityStateRequest request = new SetProductQuantityStateRequest();
+        request.setProductId(productId);
+        request.setQuantityState(quantityState);
+        return productService.setProductQuantityState(request);
     }
 }
